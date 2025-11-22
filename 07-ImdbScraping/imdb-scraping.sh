@@ -46,11 +46,6 @@ RATINGS_TXT="./tmp/ratings.txt"
 RELEASE_TXT="./tmp/releases.txt"
 TOPMOVIES_CSV="topmovies.csv"
 
-# criar diretório para arquivos temporários, caso não exista:
-directory() {
-    [ ! -d tmp ] mkdir tmp
-}
-
 # importando o texto html do site e redirecionando a saída para
 # o arquivo 'top_filmes.html':
 access() {
@@ -73,14 +68,17 @@ release() {
 }
 
 #################################################################
+
+# criar diretório para arquivos temporários, caso não exista:
+[ ! -d tmp ] mkdir tmp
+
 # verificar se o 'curl' não está instalado e perguntar se deve
 # se instalar:
-[ ! -x "$(which curl)" ] && \
-    echo -e \
-    "This script uses curl to access Websites.
-    Do you want to install it?"
-
-        read -p "(Y/n):" INSTALL_OPT
+[ ! -x "$(which curl)" ] && echo "\033[1;5;31mCurl missing!"
+        sleep 3
+        echo -e "This script uses curl to access Websites.
+Do you want to install it?"
+        read -p "(Y/n): " INSTALL_OPT
 
         # transformar qualquer opção passada em 'INSTALL_OPT'
         # em minúsculas, com o novo recurso do Bash 4.0
@@ -109,8 +107,6 @@ release() {
         esac
 
 #################################################################
-
-directory
 
 # testando se o número total de parâmetros passados é
 # igual a zero:
