@@ -41,20 +41,18 @@ $(basename $0) - [OPTIONS]
 
     -h - Help menu.
     -v - Version.
-    -g - Extract the Worldwide Gross of the films.
-    -n - Extract only film names from highest-grossing list in Wikipaedia.
-    -r - Extract ratings.
+    -g - Extract gross revenues by film.
+    -n - Extract only films names.
     -y - Extract release dates.
     With no options, the script returns all data.
 "
-VERSION="$(basename $0)v1.0"
+VERSION="$(basename $0)v1.1"
 TMP_PATH="$(pwd)/tmp"
-HTML_FILE="$TMP_PATH/top_movies.html"
-NAMES_TXT="$TMP_PATH/movie_names.txt"
+HTML_FILE="$TMP_PATH/highest_grossing.html"
+NAMES_TXT="$TMP_PATH/films_names.txt"
 GROSS_TXT="$TMP_PATH/gross.txt"
-RATINGS_TXT="$TMP_PATH/ratings.txt"
 RELEASE_TXT="$TMP_PATH/releases.txt"
-TOPMOVIES_CSV="topmovies.csv"
+HIGHGROSSFILMS_CSV="highest_grossing_films.csv"
 
 # importando o texto html do site, simulando ser uma requisição de um
 # navegador (-A "Mozilla/5.0"), permitindo seguir redirecionamentos de URL com
@@ -71,11 +69,6 @@ name() {
 gross() {
     sed -n 's/.*ipc-rating-star--rating">\([0-9]\+\.[0-9]\+\).*/\1/p' \
     "$HTML_FILE" > "$GROSS_TXT"
-}
-
-rating() {
-    sed -n 's/.*ipc-rating-star--rating">\([0-9]\+\.[0-9]\+\).*/\1/p' \
-    "$HTML_FILE" > "$RATINGS_TXT"
 }
 
 release() {
@@ -134,7 +127,7 @@ if [ "$#" -eq 0 ]; then
     # não havendo parâmetro algum, todas as funções são
     # executadas, como comportamento padrão:
     name
-    rating
+    gross
     release
 else
     # 'while' com um 'test' da posição '$1' que verifica
@@ -152,9 +145,9 @@ else
             -n)
                 name
                 ;;
-            -r)
+            -g)
                 name
-                rating
+                gross
                 ;;
             -y)
                 name
@@ -174,8 +167,8 @@ fi
 # arquivo, encaminhando eventuais mensagens de erro para
 # '/dev/null', caso algum arquivo não exista; '<(cat)' executa
 # o 'cat' em um subshell:
-paste -d',' <(cat "$NAMES_TXT" 2>/dev/null) <(cat "$RATINGS_TXT" 2>/dev/null) \
-    <(cat "$RELEASE_TXT" 2>/dev/null) > top_filmes.csv
+paste -d',' <(cat "$NAMES_TXT" 2>/dev/null) <(cat "$GROSS_TXT" 2>/dev/null) \
+    <(cat "$RELEASE_TXT" 2>/dev/null) > "$HIGHGROSSFILMS_CSV"
 
 # verificar se o diretório temporário foi criado e remover:
 [ -d "$TMP_PATH" ] && rm -rf "$TMP_PATH"
