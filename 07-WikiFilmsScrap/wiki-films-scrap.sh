@@ -9,7 +9,7 @@
 #                                                               #
 #################################################################
 # This script returns data about highest-grossing Movies,       #
-# according with Wikipaedia, such as a web scraper, and creates #
+# according with Wikipaedia, such as a web scraper, and outputs #
 # a file in CSV format.                                         #
 #                                                               #
 # Usage example:                                                #
