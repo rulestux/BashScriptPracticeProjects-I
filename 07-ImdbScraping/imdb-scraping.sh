@@ -70,41 +70,42 @@ release() {
 #################################################################
 
 # criar diretório para arquivos temporários, caso não exista:
-[ ! -d tmp ] mkdir tmp
+[ ! -d tmp ] && mkdir tmp
 
 # verificar se o 'curl' não está instalado e perguntar se deve
 # se instalar:
-[ ! -x "$(which curl)" ] && echo "\033[1;5;31mCurl missing!"
-        sleep 3
-        echo -e "This script uses curl to access Websites.
-Do you want to install it?"
-        read -p "(Y/n): " INSTALL_OPT
+if [ ! -x "$(which curl)" ]; then
+    echo "\033[1;5;31mCurl missing!"
+    sleep 3
+    echo -e "This script uses curl to access Websites.
+Would you want to install it?"
+    read -p "(Y/n): " INSTALL_OPT
 
-        # transformar qualquer opção passada em 'INSTALL_OPT'
-        # em minúsculas, com o novo recurso do Bash 4.0
-        # ',,' para minúsculas e '^^' para maiúsculas:
-        INSTALL_OPT=${INSTALL_OPT,,}
+    # transformar qualquer opção passada em 'INSTALL_OPT'
+    # em minúsculas, com 'tr':
+    INSTALL_OPT=$(echo "$INSTALL_OPT" | tr '[:upper:]' '[:lower:]')
 
-        # testar se a entrada é nula, para redefinir para o
-        # padrão 'y':
-        if [ -z "$INSTALL_OPT" ]; then
-            INSTALL_OPT="y"
-        fi
+    # testar se a entrada é nula, para redefinir para o
+    # padrão 'y':
+    if [ -z "$INSTALL_OPT" ]; then
+        INSTALL_OPT="y"
+    fi
 
-        # case para as ações:
-        case "$INSTALL_OPT" in
-            y)
-                sudo apt install curl -y
-                ;;
-            n)
-                echo "Exiting script." && exit 0
-                ;;
-            # tratamento de exceção && saída de erro #1:
-            *)
-                echo "Invalid option. Enter $(basename $0) -h for more details."\
-                && exit 11
-                ;;
-        esac
+    # case para as ações:
+    case "$INSTALL_OPT" in
+        y)
+            sudo apt install curl -y
+            ;;
+        n)
+            echo "Exiting script." && exit 0
+            ;;
+        # tratamento de exceção && saída de erro #1:
+        *)
+            echo "Invalid option. Enter $(basename $0) -h for more details."\
+            && exit 1
+            ;;
+    esac
+fi
 
 #################################################################
 
