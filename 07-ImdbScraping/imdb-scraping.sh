@@ -13,9 +13,12 @@
 # in CSV format.                                                #
 #                                                               #
 # Usage example:                                                #
-#   ./imdb-scraping.sh <parameters>                             #
 #                                                               #
-#   use '-h' parameter for help.                                #
+#   $ ./imdb-scraping.sh -n                                     #
+#                                                               #
+#       creates a '*.csv' file with more rated Movies.          #
+#                                                               #
+# Use '-h' parameter for help.                                  #
 #                                                               #
 #################################################################
 # History:                                                      #
@@ -40,37 +43,39 @@ $(basename $0) - [OPTIONS]
     With no options, the script returns all data.
 "
 VERSION="$(basename $0)v1.0"
-HTML_FILE="./tmp/top_movies.html"
-NAMES_TXT="./tmp/movie_names.txt"
-RATINGS_TXT="./tmp/ratings.txt"
-RELEASE_TXT="./tmp/releases.txt"
+TMP_PATH="$(pwd)/tmp"
+HTML_FILE="$TMP_PATH/top_movies.html"
+NAMES_TXT="$TMP_PATH/movie_names.txt"
+RATINGS_TXT="$TMP_PATH/ratings.txt"
+RELEASE_TXT="$TMP_PATH/releases.txt"
 TOPMOVIES_CSV="topmovies.csv"
 
 # importando o texto html do site e redirecionando a saída para
 # o arquivo 'top_filmes.html':
 access() {
+    touch "$HTML_FILE"
     curl -o "$HTML_FILE" "https://www.imdb.com/chart/top"
 }
 
 name() {
-    sed -n 's/.*text--reduced">[0-9]\+.\s*$.*$<\/h3>.*/\1/p' \
+    sed -n 's/.*text--reduced">[0-9]\+.\s*\(.*\)<\/h3>.*/\1/p' \
     "$HTML_FILE" > "$NAMES_TXT"
 }
 
 rating() {
-    sed -n 's/.*ipc-rating-star--rating">$[0-9]\+\.[0-9]\+$.*/\1/p' \
+    sed -n 's/.*ipc-rating-star--rating">\([0-9]\+\.[0-9]\+\).*/\1/p' \
     "$HTML_FILE" > "$RATINGS_TXT"
 }
 
 release() {
-    sed -n 's/.*">$[1-2][0,9][0-2,9][0-9]$<\/span>.*/\1/p' \
+    sed -n 's/.*">\([1-2][0,9][0-2,9][0-9]\)<\/span>.*/\1/p' \
     "$HTML_FILE" > "$RELEASE_TXT"
 }
 
 #################################################################
 
 # criar diretório para arquivos temporários, caso não exista:
-[ ! -d tmp ] && mkdir tmp
+[ ! -d "$TMP_PATH" ] && mkdir "$TMP_PATH"
 
 # verificar se o 'curl' não está instalado e perguntar se deve
 # se instalar:
@@ -159,4 +164,4 @@ paste -d',' <(cat "$NAMES_TXT" 2>/dev/null) <(cat "$RATINGS_TXT" 2>/dev/null) \
     <(cat "$RELEASE_TXT" 2>/dev/null) > top_filmes.csv
 
 # verificar se o diretório temporário foi criado e remover:
-[ -d "./tmp" ] && rm -rf tmp
+[ -d "$TMP_PATH" ] && rm -rf "$TMP_PATH"
