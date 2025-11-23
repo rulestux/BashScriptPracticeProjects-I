@@ -1,28 +1,32 @@
 #!/usr/bin/env bash
 
 #################################################################
-# imdb-scraping.sh                                              #
+# wiki-films-scrap.sh                                           #
 #                                                               #
 # Site:         https://github.com/rulestux                     #
 # Author:       Jean Felipe                                     #
 # Maintenance:  Jean Felipe                                     #
 #                                                               #
 #################################################################
-# This script returns data about top movies published in IMDB,  #
-# such as a web scraper, and creates a file with the output     #
-# in CSV format.                                                #
+# This script returns data about highest-grossing Movies,       #
+# according with Wikipaedia, such as a web scraper, and creates #
+# a file in CSV format.                                         #
 #                                                               #
 # Usage example:                                                #
 #                                                               #
-#   $ ./imdb-scraping.sh -n                                     #
+#   $ ./wiki-films-scrap.sh -n                                  #
 #                                                               #
-#       creates a '*.csv' file with more rated Movies.          #
+#       creates a '*.csv' file with names of more rated Movies. #
 #                                                               #
 # Use '-h' parameter for help.                                  #
 #                                                               #
 #################################################################
 # History:                                                      #
 #   v1.0 2025-11-22, Jean Felipe.                               #
+#       Script created.                                         #
+#                                                               #
+#   v1.1 2025-11-23, Jean Felipe.                               #
+#       Target changed to Wikipaedia.                           #
 #                                                               #
 #################################################################
 # Tested on:                                                    #
@@ -37,7 +41,8 @@ $(basename $0) - [OPTIONS]
 
     -h - Help menu.
     -v - Version.
-    -n - Extract only movie names from Top Movies in IMDB.
+    -g - Extract the Worldwide Gross of the films.
+    -n - Extract only film names from highest-grossing list in Wikipaedia.
     -r - Extract ratings.
     -y - Extract release dates.
     With no options, the script returns all data.
@@ -46,20 +51,26 @@ VERSION="$(basename $0)v1.0"
 TMP_PATH="$(pwd)/tmp"
 HTML_FILE="$TMP_PATH/top_movies.html"
 NAMES_TXT="$TMP_PATH/movie_names.txt"
+GROSS_TXT="$TMP_PATH/gross.txt"
 RATINGS_TXT="$TMP_PATH/ratings.txt"
 RELEASE_TXT="$TMP_PATH/releases.txt"
 TOPMOVIES_CSV="topmovies.csv"
 
-# importando o texto html do site e redirecionando a saída para
-# o arquivo 'top_filmes.html':
+# importando o texto html do site, simulando ser uma requisição de um
+# navegador (-A "Mozilla/5.0"), permitindo seguir redirecionamentos de URL com
+# '-L', e redirecionando a saída, com '-o', para o arquivo 'top_filmes.html':
 access() {
-    touch "$HTML_FILE"
-    curl -o "$HTML_FILE" "https://www.imdb.com/chart/top"
+    curl -A "Mozilla/5.0" -L -o "$HTML_FILE" "https://en.wikipedia.org/wiki/List_of_highest-grossing_films"
 }
 
 name() {
     sed -n 's/.*text--reduced">[0-9]\+.\s*\(.*\)<\/h3>.*/\1/p' \
     "$HTML_FILE" > "$NAMES_TXT"
+}
+
+gross() {
+    sed -n 's/.*ipc-rating-star--rating">\([0-9]\+\.[0-9]\+\).*/\1/p' \
+    "$HTML_FILE" > "$GROSS_TXT"
 }
 
 rating() {
@@ -113,6 +124,9 @@ Would you want to install it?"
 fi
 
 #################################################################
+
+# acessando o IMDB e crando cópia do arquivo HTML:
+access
 
 # testando se o número total de parâmetros passados é
 # igual a zero:
