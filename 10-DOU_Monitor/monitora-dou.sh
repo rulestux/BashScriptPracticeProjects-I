@@ -19,6 +19,9 @@
 #################################################################
 # History:                                                      #
 #   v1.0 2026-06-29, Jean Felipe.                               #
+#   v1.1 2026-06-30, Jean Felipe.                               #
+#       Substituição do anacron pelo cron.                      #
+#                                                               #
 #                                                               #
 #################################################################
 # Tested on:                                                    #
@@ -26,13 +29,18 @@
 #                                                               #
 #################################################################
 
-# Acrescentar a linha abaixo ao arquivo `/etc/anacrontab`, para
-# automatizar a execução do script diariamente (O horário de
-# execução do anacron pode ser checado e ajustado no arquivo
-# `/etc/crontab`):
-# 1   5   dou.monitoramento   su - SEU_USUARIO -c "DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u SEU_USUARIO)/bus /caminho/para/monitora-dou.sh"
+# Acrescentar as linhas abaixo ao arquivo `/etc/crontab`, para
+# automatizar a execução do script diariamente (substituir o 1000
+# do `path` pelo id de usuário, verificável através de `id -u`):
 
-# Inserir o nome para a busca:
+# Linha A: Roda o script diariamente às 22:00 (apenas se o PC estiver ligado):
+#00 22 * * * DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus /caminho/para/monitora-dou.sh
+
+# Linha B: Caso o PC esteja desligado às 22:00, roda 5 minutos após o boot:
+#@reboot sleep 300 && DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus /caminho/para/monitora-dou.sh
+
+
+# Inserir aqui o nome para a busca:
 NAME_SEARCH="Nome Completo de Candidato"
 
 # Testar se o nome foi passado como parâmetro (Se nenhum parâmetro
@@ -53,7 +61,8 @@ done
 # Codifica o espaço como '%20' para a URL do curl com sed:
 #NAME_URL=$(echo "$NAME_SEARCH" | sed 's/ /%20/g')
 
-# Alternativamente, codifica o espaço como %20 no Bash (mais rápido que o sed):
+# Alternativamente, codifica o espaço como '%20' nativamente no Bash (mais
+# rápido do que com o sed):
 NAME_URL="${NAME_SEARCH// /%20}"
 
 URL="https://www.in.gov.br/consulta/-/buscar/dou?q=%22${NAME_URL}%22&s=todos&exactDate=all&sortType=0"
@@ -90,7 +99,7 @@ if ! diff -q "$OLD_FILE" "$NEW_FILE" > /dev/null; then
     # Atualiza a referência para não notificar a mesma coisa no dia seguinte:
     cp "$NEW_FILE" "$OLD_FILE"
 
-    # IV. LOOP DE NOTIFICAÇÃO PERSISTENTE
+    # IV. LOOP DE NOTIFICAÇÃO PERSISTENTE (diferentes métodos):
     while true; do
 
         # -----------------------------------------------------------------
@@ -141,7 +150,7 @@ if ! diff -q "$OLD_FILE" "$NEW_FILE" > /dev/null; then
         #    break
         #fi
 
-        # Se a notificação for ignorada ou fechada, espera 5 minutos e repete
+        # Se a notificação for ignorada ou fechada, espera 5 minutos e repete:
         sleep 300
     done
 fi
