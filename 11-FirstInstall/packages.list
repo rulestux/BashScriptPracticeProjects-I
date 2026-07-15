@@ -1,0 +1,34 @@
+# packages.list - Lista modular de pacotes por ambiente
+
+# Pacotes para instalar em qualquer ambiente/DE
+BASE_PACKAGES=(
+    btop
+    htop
+    iotop
+    nethogs
+    iftop
+    iptraf-ng
+    sysstat
+    strace
+    i3
+    picom
+    rofi
+    ranger
+    flameshot
+    pavucontrol
+    pulsemixer
+    dbus-user-session
+    arandr
+)
+
+# Pacotes específicos para instalar com o Cinnamon
+CINNAMON_PACKAGES=(
+    xfce4-terminal
+    thunar
+)
+
+# Pacotes específicos para instalar com o XFCE
+XFCE_PACKAGES=(
+    cinnamon-settings-daemon
+    nemo
+)

@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+
+#################################################################
+# first-install - Install packages listed and categorized in    #
+#                 'packages.list' file.                         #
+#                                                               #
+# Site:          https://github.com/rulestux                    #
+# Author:        Jean Felipe                                    #
+# Maintenance:   Jean Felipe                                    #
+# License:       MIT                                            #
+#                                                               #
+#################################################################
+# Description:                                                  #
+#   Automated post-installation script for system               #
+#   provisioning via apt-get. It utilizes a modular data        #
+#   structure driven by an external 'packages.list' file,       #
+#   effectively separating logic from data. The script accepts  #
+#   dynamic parameters in any order to filter specific          #
+#   Desktop Environment profiles (cinnamon, xfce), a minimal    #
+#   installation (base), or the complete infrastructure (all).  #
+#   It also features an on-demand cache update trigger (update).#
+#                                                               #
+# Usage examples:                                               #
+#   $ sudo ./first_install.sh                                   #
+#   $ sudo ./first_install.sh base                              #
+#   $ sudo ./first_install.sh xfce update                       #
+#   $ sudo ./first_install.sh update cinnamon                   #
+#                                                               #
+#################################################################
+# History:                                                      #
+#   v0.1 2026-07-15, Jean Felipe.                               #
+#                                                               #
+#################################################################
+# Tested on:                                                    #
+#   bash v5.2                                                   #
+#                                                               #
+#################################################################
+
+# Garante que o script seja executado como root
+if [ "$EUID" -ne 0 ]; then
+    echo "Erro: Este script precisa ser executado como root (use sudo)."
+    exit 1
+fi
+
+# ==============================================================================
+# CONFIGURAÇÕES E VARIÁVEIS DE CONTROLE
+# ==============================================================================
+SHOULD_UPDATE=false
+CHOSEN_DE=""
+FINAL_PACKAGES=()
+
+# ==============================================================================
+# FUNÇÃO DE AJUDA / USO
+# ==============================================================================
+show_help() {
+    echo "=============================================================================="
+    echo "AJUDA (HELP)"
+    echo "=============================================================================="
+    echo "Uso: sudo $0 [base | cinnamon | xfce | all] [update]"
+    echo "------------------------------------------------------------------------------"
+    echo "Parâmetros de Ambiente (Opcionais):"
+    echo "  all (ou sem especificar DE) : Instala absolutamente TODOS os pacotes (padrão)."
+    echo "  base                        : Instala apenas os pacotes base."
+    echo "  cinnamon                    : Instala apenas pacotes base + para Cinnamon."
+    echo "  xfce                        : Instala apenas pacotes base + para XFCE."
+    echo "------------------------------------------------------------------------------"
+    echo "Parâmetros de Atualização (Opcionais):"
+    echo "  update                      : Executa 'apt-get update' antes de iniciar."
+    echo "------------------------------------------------------------------------------"
+    echo "Exemplos:"
+    echo "  sudo $0                 # Instala tudo (Base + Cinnamon + XFCE) (padrão)"
+    echo "  sudo $0 base            # Instala apenas os pacotes base"
+    echo "  sudo $0 update          # Atualiza o apt e instala tudo (padrão)"
+    echo "  sudo $0 xfce            # Instala apenas XFCE e Base (sem update)"
+    echo "  sudo $0 update cinnamon # Atualiza o apt e instala Cinnamon + Base"
+    echo "=============================================================================="
+    exit 1
+}
+
+# ==============================================================================
+# TRATAMENTO DINÂMICO DE PARÂMETROS (WHILE / CASE)
+# ==============================================================================
+# Varre todos os argumentos passados para o script
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        update)
+            SHOULD_UPDATE=true
+            shift # Passa para o próximo argumento
+            ;;
+        all|base|cinnamon|xfce)
+            CHOSEN_DE="$1"
+            shift
+            ;;
+        -h|--help)
+            show_help
+            ;;
+        *)
+            echo "Erro: Parâmetro inválido '$1'"
+            echo ""
+            show_help
+            ;;
+    esac
+done
+
+# ==============================================================================
+# LÓGICA DO VALOR PADRÃO
+# ==============================================================================
+# Se o usuário não especificou nenhuma DE, o script assume o comportamento de instalar tudo.
+if [ -z "$CHOSEN_DE" ]; then
+    CHOSEN_DE="all"
+fi
+
+# ==============================================================================
+# CARREGAMENTO DO ARQUIVO DE LISTA DE PACOTES
+# ==============================================================================
+CURRENT_DIR="$(dirname "$(readlink -f "$0")")"
+PACKAGES_FILE="${CURRENT_DIR}/packages.list"
+
+if [ -f "$PACKAGES_FILE" ]; then
+    echo "--> Carregando lista de pacotes de: ${PACKAGES_FILE}"
+    source "$PACKAGES_FILE"
+else
+    echo "Erro: Arquivo '${PACKAGES_FILE}' não encontrado!"
+    exit 1
+fi
+
+# ==============================================================================
+# MONTAGEM DINÂMICA DO ARRAY DE INSTALAÇÃO
+# ==============================================================================
+# Adiciona sempre os pacotes base
+FINAL_PACKAGES+=("${BASE_PACKAGES[@]}")
+
+# Adiciona condicionalmente os pacotes das DEs
+case "$CHOSEN_DE" in
+    all)
+        echo "--> Modo padrão ativo: Instalar TUDO (Base + Cinnamon + XFCE)"
+        FINAL_PACKAGES+=("${CINNAMON_PACKAGES[@]}")
+        FINAL_PACKAGES+=("${XFCE_PACKAGES[@]}")
+        ;;
+    base)
+        echo "--> Modo selecionado: Base"
+        ;;
+    cinnamon)
+        echo "--> Modo selecionado: Cinnamon + Base"
+        FINAL_PACKAGES+=("${CINNAMON_PACKAGES[@]}")
+        ;;
+    xfce)
+        echo "--> Modo selecionado: XFCE + Base"
+        FINAL_PACKAGES+=("${XFCE_PACKAGES[@]}")
+        ;;
+esac
+
+# Validação final do array gerado
+if [ ${#FINAL_PACKAGES[@]} -eq 0 ]; then
+    echo "Erro: A lista final de pacotes gerada está vazia."
+    exit 1
+fi
+
+# ==============================================================================
+# FUNÇÃO PRINCIPAL DE INSTALAÇÃO
+# ==============================================================================
+run_installation() {
+    echo "========================================================================"
+    echo " Iniciando o provisionamento do sistema..."
+    echo "========================================================================"
+    echo ""
+
+    if [ "$SHOULD_UPDATE" = true ]; then
+        echo "--> [FLAG DETECTADA] Atualizando listas do apt..."
+        apt-get update
+        echo ""
+    else
+        echo "--> Pulando 'apt-get update' (use a flag 'update' se desejar atualizar)."
+        echo ""
+    fi
+
+    echo "--> Instalando pacotes selecionados via apt-get..."
+    apt-get install -y "${FINAL_PACKAGES[@]}"
+
+    local status=$?
+
+    echo ""
+    if [ $status -eq 0 ]; then
+        echo "========================================================================"
+        echo " Instalação concluída com sucesso para o perfil: ${CHOSEN_DE}!"
+        echo "========================================================================"
+    else
+        echo "========================================================================"
+        echo " Ocorreu um erro na instalação. Verifique os logs acima."
+        echo "========================================================================"
+    fi
+}
+
+run_installation
