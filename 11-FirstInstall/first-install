@@ -21,10 +21,10 @@
 #   It also features an on-demand cache update trigger (update).#
 #                                                               #
 # Usage examples:                                               #
-#   $ sudo ./first_install.sh                                   #
-#   $ sudo ./first_install.sh base                              #
-#   $ sudo ./first_install.sh xfce update                       #
-#   $ sudo ./first_install.sh update cinnamon                   #
+#   $ first_install                                             #
+#   $ first_install base                                        #
+#   $ first_install xfce update                                 #
+#   $ first_install update cinnamon                             #
 #                                                               #
 #################################################################
 # History:                                                      #
@@ -37,10 +37,10 @@
 #################################################################
 
 # Garante que o script seja executado como root
-if [ "$EUID" -ne 0 ]; then
-    echo "Erro: Este script precisa ser executado como root (use sudo)."
-    exit 1
-fi
+#if [ "$EUID" -ne 0 ]; then
+#    echo "Erro: Este script precisa ser executado como root (use sudo)."
+#    exit 1
+#fi
 
 # ==============================================================================
 # CONFIGURAÇÕES E VARIÁVEIS DE CONTROLE
@@ -56,7 +56,7 @@ show_help() {
     echo "=============================================================================="
     echo "AJUDA (HELP)"
     echo "=============================================================================="
-    echo "Uso: sudo $0 [base | cinnamon | xfce | all] [update]"
+    echo "Uso: $0 [base | cinnamon | xfce | all] [update]"
     echo "------------------------------------------------------------------------------"
     echo "Parâmetros de Ambiente (Opcionais):"
     echo "  all (ou sem especificar DE) : Instala absolutamente TODOS os pacotes (padrão)."
@@ -68,11 +68,11 @@ show_help() {
     echo "  update                      : Executa 'apt-get update' antes de iniciar."
     echo "------------------------------------------------------------------------------"
     echo "Exemplos:"
-    echo "  sudo $0                 # Instala tudo (Base + Cinnamon + XFCE) (padrão)"
-    echo "  sudo $0 base            # Instala apenas os pacotes base"
-    echo "  sudo $0 update          # Atualiza o apt e instala tudo (padrão)"
-    echo "  sudo $0 xfce            # Instala apenas XFCE e Base (sem update)"
-    echo "  sudo $0 update cinnamon # Atualiza o apt e instala Cinnamon + Base"
+    echo "  $0                 # Instala tudo (Base + Cinnamon + XFCE) (padrão)"
+    echo "  $0 base            # Instala apenas os pacotes base"
+    echo "  $0 update          # Atualiza o apt e instala tudo (padrão)"
+    echo "  $0 xfce            # Instala apenas XFCE e Base (sem update)"
+    echo "  $0 update cinnamon # Atualiza o apt e instala Cinnamon + Base"
     echo "=============================================================================="
     exit 1
 }
@@ -166,16 +166,16 @@ run_installation() {
     echo ""
 
     if [ "$SHOULD_UPDATE" = true ]; then
-        echo "--> [FLAG DETECTADA] Atualizando listas do apt..."
-        apt-get update
+        echo "--> Atualizando listas do apt..."
+        sudo apt-get update
         echo ""
     else
-        echo "--> Pulando 'apt-get update' (use a flag 'update' se desejar atualizar)."
+        echo "--> Use a flag 'update' se desejar atualizar."
         echo ""
     fi
 
     echo "--> Instalando pacotes selecionados via apt-get..."
-    apt-get install -y "${FINAL_PACKAGES[@]}"
+    sudo apt-get install "${FINAL_PACKAGES[@]}"
 
     local status=$?
 
