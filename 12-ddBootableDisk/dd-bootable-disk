@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+
+#################################################################
+# dd-bootable-disk - Safely flashes bootable ISO images to      #
+#                    removable USB storage devices.             #
+#                                                               #
+# Site:         https://github.com/rulestux                     #
+# Author:       Jean Felipe                                     #
+# Maintenance:  Jean Felipe                                     #
+# License:      MIT                                             #
+#                                                               #
+#################################################################
+# Description:                                                  #
+#   An interactive, safety-first CLI utility designed to write  #
+#   hybrid ISO files directly to USB flash drives using 'dd'.   #
+#   It implements strict system disk filters and regex-based    #
+#   validations to prevent accidental target storage overrides, #
+#   handling administrative elevations gracefully at runtime.   #
+#                                                               #
+# Usage example:                                                #
+#   $ ./dd-bootable-disk                                        #
+#                                                               #
+#################################################################
+# History:                                                      #
+#   v0.1 2026-07-17, Jean Felipe.                               #
+#                                                               #
+#################################################################
+# Tested on:                                                    #
+#   bash v5.2                                                   #
+#                                                               #
+#################################################################
+
+#===============================================================================
+# FUNÇÕES DE UTILIDADE E CONTROLE
+#===============================================================================
+
+# Função didática para imprimir mensagens com prefixos coloridos de forma padronizada.
+# Usa códigos de escape ANSI básicos para colorir o terminal (1=Negrito, 31=Vermelho, 32=Verde, 33=Amarelo).
+log_info() { echo -e "\e[1;32m[INFO]\e[0m $*"; }
+log_warn() { echo -e "\e[1;33m[WARN]\e[0m $*"; }
+log_err()  { echo -e "\e[1;31m[ERR]\e[0m $*"; }
+
+# Garante que o script NÃO seja executado diretamente como root via sudo no início.
+# Queremos capturar a $HOME e o ambiente do usuário comum perfeitamente,
+# elevando o privilégio apenas quando o 'dd' ou o 'umount' forem chamados.
+prevent_root_execution() {
+    # A variável interna do Bash $EUID (Effective User ID) armazena o ID do usuário que executa o script.
+    # O ID do usuário root é sempre 0. Se for igual a 0, abortamos para proteger o ambiente local.
+    if [ "$EUID" -eq 0 ]; then
+        log_err "Please DO NOT run this script with sudo directly."
+        echo "Usage: ./$(basename "$0")"
+        exit 1
+    fi
+}
+
+#===============================================================================
+# FLUXO PRINCIPAL DO SCRIPT
+#===============================================================================
+
+# Executa a trava de segurança de privilégio inicial
+prevent_root_execution
+
+# 1. SOLICITAÇÃO DO ARQUIVO ISO
+echo "--------------------------------------------------------"
+read -r -p "Enter the full path to the .iso image (or drag and drop here): " iso_path
+echo "--------------------------------------------------------"
+
+# --- Expansão de Parâmetros do Bash ---
+# Quando arrastamos um arquivo para o terminal, ele pode vir encapsulado em aspas simples ou duplas.
+# Para evitar erros de "arquivo não encontrado", usamos a sintaxe de substituição de strings do Bash:
+# ${variavel//padrao/substituto} -> Duas barras indicam substituição global (todas as ocorrências).
+# Aqui, localizamos caracteres de aspas simples (\') e aspas duplas (\") e os removemos (substituindo por nada).
+iso_path="${iso_path//\'/}"
+iso_path="${iso_path//\"/}"
+
+# Valida se o arquivo de fato existe no filesystem utilizando o operador -f (file exists and is a regular file)
+if [ ! -f "$iso_path" ]; then
+    log_err "The ISO file '${iso_path}' was not found!"
+    exit 1
+fi
+
+
+# 2. DETECÇÃO E EXIBIÇÃO DE DISPOSITIVOS REMOVÍVEIS
+echo -e "\n========================================================"
+echo "            DETECTED REMOVABLE USB DEVICES"
+echo "========================================================"
+
+# --- Filtragem Inteligente com Operadores Lógicos ---
+# lsblk: Utilitário para listar block devices (discos/partições).
+# -o: Especifica quais colunas de metadados queremos extrair (NAME, SIZE, MODEL, TRAN).
+# TRAN=usb: Filtra especificamente os barramentos de transporte do tipo USB.
+# O operador '||' (OR lógico) funciona como um fallback automático:
+# Se o primeiro comando falhar ou não encontrar nenhum dispositivo USB, ele executa o comando após as duas barras,
+# que lista todos os discos (-d), omitindo o "sda" (comumente o disco principal do sistema) via grep reverso (-v).
+lsblk -o NAME,SIZE,MODEL,TRAN | grep -E "usb|tran" || lsblk -d -o NAME,SIZE,MODEL | grep -v "sda"
+
+echo "========================================================"
+
+
+# 3. SELEÇÃO E VALIDAÇÃO RÍGIDA DO DISPOSITIVO DE DESTINO
+read -r -p "Enter ONLY the letter of the USB drive (e.g., sdb, sdc): " pen_letter
+
+# --- Conversão para Caixa Baixa nativa do Bash 4.0+ ---
+# A sintaxe "${variavel,,}" converte todos os caracteres da string armazenada em minúsculas de forma nativa,
+# dispensando chamadas a utilitários externos lentos como 'tr' ou 'awk'.
+pen_letter="${pen_letter,,}"
+
+# Valida se o usuário simplesmente pressionou Enter deixando a variável vazia (-z avalia se o tamanho da string é zero)
+if [ -z "$pen_letter" ]; then
+    log_err "You must enter a valid drive letter!"
+    exit 1
+fi
+
+# --- Expressões Regulares em Condicionais Duplas [[ ... ]] ---
+# No Bash, a sintaxe [[ ... ]] é muito mais poderosa e segura do que os colchetes simples [ ... ].
+# Ela permite usar operadores como '=~' para testar se uma string corresponde a uma Expressão Regular.
+# A regex '^nvme' verifica se o nome do disco inicia com "nvme" (padrão de SSDs modernos de sistema).
+# Também barramos explicitamente o "sda" (padrão de HDs/SSDs SATA primários).
+if [[ "$pen_letter" == "sda" || "$pen_letter" =~ ^nvme ]]; then
+    echo ""
+    log_err "SAFETY BLOCK ACTIVATED! You attempted to select a system drive ($pen_letter)."
+    log_warn "Operation aborted to prevent accidental data loss."
+    exit 1
+fi
+
+target_device="/dev/$pen_letter"
+
+# Valida se o caminho inserido corresponde de fato a um dispositivo de bloco especial válido no Linux (-b)
+if [ ! -b "$target_device" ]; then
+    log_err "The device ${target_device} does not exist!"
+    exit 1
+fi
+
+
+# 4. DESMONTAGEM DAS PARTIÇÕES (PONTO DE ELEVAÇÃO DE PRIVILÉGIO #1)
+# Se o pendrive tiver partições montadas pelo gerenciador de arquivos (ex: /dev/sdb1, /dev/sdb2),
+# o comando 'dd' pode falhar ou corromper o cache do sistema. Precisamos desmontá-las previamente.
+log_info "Unmounting any active partitions on ${target_device}..."
+
+# --- Uso do sudo pontual e ocultação de saídas ---
+# Invocamos o 'sudo' diretamente aqui. O Bash pausará a execução do script para solicitar a sua senha de usuário,
+# que ficará em cache no terminal pelos próximos minutos.
+# O caractere curinga '*' garante que todas as subpartições do drive sejam desmontadas (ex: sdb1, sdb2).
+# '2>/dev/null' redireciona mensagens de erro do comando (como avisos de partições que já estavam desmontadas)
+# para o dispositivo nulo do sistema, mantendo a saída do terminal limpa.
+sudo umount "${target_device}"* 2>/dev/null
+
+
+# 5. CONFIRMAÇÃO COM DUPLO FATOR DE ATENÇÃO
+echo -e "\n\e[1;31m⚠️⚠️⚠️ WARNING - CRITICAL ACTION ⚠️⚠️⚠️\e[0m"
+echo "SOURCE ISO: $iso_path"
+echo "TARGET DEV: $target_device"
+echo "ALL existing data on $target_device will be PERMANENTLY DESTROYED!"
+echo "--------------------------------------------------------"
+read -r -p "Are you absolutely sure you want to proceed? (type 'yes' to confirm): " user_confirmation
+
+# Força uma confirmação textual rígida para evitar prosseguir por cliques ou enters acidentais
+if [ "$user_confirmation" != "yes" ]; then
+    log_warn "Write process canceled by the user."
+    exit 1
+fi
+
+
+# 6. GRAVAÇÃO DA ISO (PONTO DE ELEVAÇÃO DE PRIVILÉGIO #2)
+echo -e "\n"
+log_info "Starting disk flashing... DO NOT unplug the USB drive."
+
+# Como o sudo já foi autenticado anteriormente na desmontagem, esta etapa iniciará sem solicitar a senha novamente.
+# Parâmetros do dd:
+#   if: input file (a ISO)
+#   of: output file (o dispositivo de bloco bruto, ex: /dev/sdb)
+#   bs=4M: tamanho do bloco de leitura/escrita para maximizar a largura de banda
+#   status=progress: exibe buffers e velocidade de transferência em tempo real
+#   oflag=sync: sincroniza fisicamente os dados com a memória flash antes de dar o comando como encerrado
+sudo dd if="$iso_path" of="$target_device" bs=4M status=progress oflag=sync
+
+echo ""
+log_info "Flashing completed successfully! Your bootable drive is ready to use."
